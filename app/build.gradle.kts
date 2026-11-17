@@ -9,8 +9,31 @@ plugins {
 }
 
 val hasGoogleServices = file("google-services.json").exists()
-val gitHash = execute("git", "rev-parse", "HEAD").take(7)
-val gitCount = execute("git", "rev-list", "--count", "HEAD").toInt()
+val isGitRepo = file("${rootDir}/.git").exists()
+val gitHash = if (isGitRepo) {
+    try {
+        providers.exec {
+            commandLine("git", "rev-parse", "HEAD")
+            isIgnoreExitValue = true
+        }.standardOutput.asText.get().trim().take(7).ifEmpty { "1.0.0" }
+    } catch (_: Exception) {
+        "1.0.0"
+    }
+} else {
+    "1.0.0"
+}
+val gitCount = if (isGitRepo) {
+    try {
+        providers.exec {
+            commandLine("git", "rev-list", "--count", "HEAD")
+            isIgnoreExitValue = true
+        }.standardOutput.asText.get().trim().toIntOrNull() ?: 1
+    } catch (_: Exception) {
+        1
+    }
+} else {
+    1
+}
 val version = "3.0.$gitCount"
 
 android {
@@ -25,7 +48,19 @@ android {
         versionName = "v${version}_$gitHash($gitCount)"
     }
 
+    signingConfigs {
+        create("debugConfig") {
+            storeFile = file("${rootDir}/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debugConfig")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -60,7 +95,7 @@ java {
 }
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(21)
 }
 
 dependencies {
@@ -92,6 +127,9 @@ if (hasGoogleServices) {
     apply(plugin = libs.plugins.crashlytics.get().pluginId)
 }
 
-fun execute(vararg command: String): String = providers.exec {
-    commandLine(*command)
-}.standardOutput.asText.get().trim()
+fun execute(vararg command: String): String = runCatching {
+    providers.exec {
+        commandLine(*command)
+        isIgnoreExitValue = true
+    }.standardOutput.asText.get().trim()
+}.getOrDefault("")

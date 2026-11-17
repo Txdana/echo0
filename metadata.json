@@ -1,0 +1,6 @@
+{
+  "name": "Echo",
+  "description": "A music player app for playing and streaming audio with extensions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
